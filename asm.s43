@@ -9,20 +9,9 @@
 
         RSEG    CSTACK                  ; pre-declaration of segment
                                               
-        RSEG    DATA16_C                ; Constant R/only data segment (Flash).
-        
-a	equ 0x01
-b	equ 0x02
-c	equ 0x10
-d	equ 0x04
-e	equ 0x80
-f	equ 0x20
-g	equ 0x08
-dp	equ 0x40
-err     equ 0xAD
-min     equ 0x08
+        RSEG    DATA16_C                ; Constant R/only data segment (Flash).       
 
-LCD_table                               ; LCD table
+LCD_table                               ; Tablica kodów LCD
         DB 0xB7                         ; 0
         DB 0x12                         ; 1
         DB 0x8F                         ; 2
@@ -35,15 +24,15 @@ LCD_table                               ; LCD table
         DB 0x3F                         ; 9
         
 ;--- TYPE ARGUMENTS HERE ----;        
-arg1    DL 2137                       ; Generates 32bit constants
-arg2    DL 25                           ; as a arguments for calc.
+arg1    DL 5                            ; Generates 32bit constant.
+arg2    DL -2                           ; Argumenty do wykonania dzialania
 
-minus   DW 0x8000
-max     DL 9999999
+minus   DW 0x8000                       ; 1000 0000 0000 0000 w U2 liczba ujemna
+err     equ 0xAD                        ; kod LCD dla liczby E
 
         RSEG DATA16_Z                   ; Initialized to 0 data segment (RAM).   
-result  DS32 1                          ; Allocates space for 32bit result.
-BCD_res DS32 1
+result  DS32 1                          ; Allocates space for 32bit variable.
+BCD_res DS32 1                          ; wynik, wynik w BCD i bufor LCD
 LCD_buf DS8 7
 
         RSEG CODE                       ; place program in 'CODE' segment
@@ -54,55 +43,62 @@ main    NOP                             ; main program
         MOV.W #WDTPW+WDTHOLD,&WDTCTL    ; Stop watchdog timer
         MOV.B #0xFD, &LCDACTL           ; Sets up LCDA register, MUX4 mode
 
-        CLR R5                          ; Clears the registers
-        CLR R6                          ; LCD buffer address
+        CLR R5                          ; Wyczyszczenie rejestrów
+        CLR R6                          ; Adres bufora LCD
         CLR R7                          ; LSB arg1
         CLR R8                          ; MSB arg1
         CLR R9                          ; LSB arg2
         CLR R10                         ; MSB arg2
-        CLR R11                         ; additional flags arg1 negative
-        CLR R12                         ; arg2 negative
-        CLR R13                         ; result negative
+        CLR R11                         ; Rejestry pomocnicze
+        CLR R12                         ;
+        CLR R13                         ; 
         
-        MOV.W arg1+2, R8                ; Moving args into registers
-        MOV.W arg1, R7
-        MOV.W arg2+2, R10
-        MOV.W arg2, R9
+        MOV.W arg1+2, R8                ; Zapisanie argumentów do rejestrów
+        MOV.W arg1, R7                  ; MSB arg1 do R8, LSB arg1 do R7
+        MOV.W arg2+2, R10               ; MSB arg2 do R10
+        MOV.W arg2, R9                  ; LSB arg2 do R9
         
-;--- CHOOSE OPERATION HERE ---;        
-        CALL #addition
+;--- WYBÓR OPERACJI ---;        
+        ;CALL #addition
         ;CALL #substraction
-        ;CALL #multiplication
+        CALL #multiplication
         
-addition                                ; addition
+addition                                ; dodawanie
         ADD.W R9, R7                    ; LSB + LSB
-        ADDC.W R10, R8                  ; MSB + MSB with Carry
-        JN set_minus_flag               ; jump to label set_minus_flag if N=1
-        JMP save_result                 ; otherwise jump to save_result
+        ADDC.W R10, R8                  ; MSB + MSB z uzwglednieniem Carry
+        JN set_minus_flag               ; Skocz do etykiety set_minus_flag jesli N=1
+        JMP save_result                 ; Jak nie to skocz do save_result
         
-substraction                            ; substraction
+substraction                            ; odejmowanie
         SUB.W R9, R7                    ; LSB - LSB
-        SUBC.W R10, R8                  ; MSB - MSB with Carry
-        JN set_minus_flag               ; jump to label set_minus_flag if N=1
-        JMP save_result                 ; otherwise jump to save_result
+        SUBC.W R10, R8                  ; MSB - MSB z uwzglednieniem Carry
+        JN set_minus_flag               ; Skocz do etykiety set_minus_flag jesli N=1
+        JMP save_result                 ; Jak nie to skocz do save_result
         
 multiplication
-        BIT minus, R8                   ; If args are negative R11 and R12 = 1
-        JN to_pos1                      ; jump to label to_pos1 if N=1
-        JMP next
-to_pos1 INV R7
+        BIT minus, R8                   ; Sprawdzenie czy arg1 < 0
+        JN to_pos1                      ; Testowanie najstarszego bitu (znak w u2)
+        JMP next                        ; Jesli arg1 dodatni sprawdz arg2
+to_pos1 INV R8                          ; Jesli ujemny zamien na dodatni
+        INV R7                          ; (odwroc bity i dodaj 1)
         INC R7
-        MOV #1, R11
-next    BIT minus, R10
+        MOV #1, R11                     ; Analogiczne sprawdzenie arg2
+next    BIT minus, R10                   
         JN to_pos2
-        JMP mltpl
-to_pos2 INV R9
+        JMP mltpl                       ; Jesli 
+to_pos2 INV R10
+        INV R9
         INC R9
         MOV #1, R12
-mltpl   MOV R9, R4                      ; Loop counter LSB arg2 = R9
+mltpl   CMP #999, R8                   ; checking if args are 16bit
+        JGE over                        ; jump to label if no carry
+        CMP #999, R10
+        JGE over
+        MOV R9, R4                      ; Loop counter LSB arg2 = R9
         MOV #1, R5                      ; and the i variable
         CLR R10
-        MOV.W arg1, R9
+        CLR R8
+        MOV.W R7, R9                    ; Mov lsb arg1 to R9
 loop    INC R5                          ; i++
         ADD.W R9, R7                    ; LSB + LSB
         ADDC.W R10, R8                  ; MSB + MSB with Carry
@@ -110,25 +106,28 @@ loop    INC R5                          ; i++
         JNZ loop                        ; if z=0 jump do loop
         CLRZ
         CMP R12, R11                    ; minus times minus is plus if R12 and R13 =1 z=1
-        JNE set_minus_flag              ; jump to label set_minus_flag if Z=0
-        JMP save_result                 ; otherwise jump to save_result
+        JEQ save_result                 ; jump to label if Z=1
+        MOV.B #0xFF,LCDM8               ; otherwise set minus and jump                        
+        MOV.W R7, result                ; Moving into result
+        MOV.W R8, result+2              ; Save result lol xDDD
+        JMP BCD_conversion
         
 set_minus_flag
-        MOV.B #0x10,LCDM8 ;JAK ZAPALIC MINUSA?
-        JMP save_result  
-
+        MOV.B #0x04,LCDM8 ;JAK ZAPALIC MINUSA? ZAPALIMY PLUSA XD
+        JMP save_result
+        
 save_result
         MOV.W R7, result                ; Moving into result
         MOV.W R8, result+2
         BIT minus, result+2             ; Checking if result is < 0
         JN is_negative                  ; if result < 0 N=1
-        JMP BCD_conversion
 is_negative 
         INV result+2                    ; Conversion to positive number in U2 
         INV result                      
         INC result
         DADC result+2                   ; adding Carry
-        
+        JMP BCD_conversion
+
 BCD_conversion
         MOV #32, R5                     ; 32 digits
         CLR R8
@@ -139,8 +138,8 @@ shift   RLA result                       ; Rotate left
         DADD R8, R8
         DEC R5                          ; R15--
         JNZ shift                        ; Jump label shift if Z=0
-        MOV R9, BCD_res
-        MOV R8, BCD_res+2
+        MOV.W R9, BCD_res
+        MOV.W R8, BCD_res+2
         ; Based on MSP 430 Mixed Signal Microcontroller Application Reports
         ; (page 559)
         
@@ -149,7 +148,7 @@ range
         JC over
         JMP write_buffer
 over    MOV.B #0xAD, LCDM1
-        JMP end_programme
+        JMP end_programme 
 
 write_buffer
         MOV #0x000F, R7                 ; Setting up mask
@@ -198,4 +197,4 @@ end_programme
         NOP
         JMP $                           ; jump to current location '$'
                                         ; (endless loop)
-        END
+END
