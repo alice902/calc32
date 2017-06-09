@@ -11,7 +11,7 @@
                                               
         RSEG    DATA16_C                ; Constant R/only data segment (Flash).       
 
-LCD_table                               ; Tablica kodĂłw LCD
+LCD_table                               ; Tablica kodow LCD
         DB 0xB7                         ; 0
         DB 0x12                         ; 1
         DB 0x8F                         ; 2
@@ -23,8 +23,8 @@ LCD_table                               ; Tablica kodĂłw LCD
         DB 0xBF                         ; 8
         DB 0x3F                         ; 9
         
-;--- WPROWADZENIE ARGUMENTĂ“W ----;        
-arg1    DL -90000                            ; Generates 32bit constant.
+;--- WPROWADZENIE ARGUMENTOW ----;        
+arg1    DL -90000                       ; Generates 32bit constant.
 arg2    DL 50                           ; Argumenty do wykonania operacji.
 
 minus   DW 0x8000                       ; 1000 0000 0000 0000 w U2 liczba ujemna
@@ -54,7 +54,7 @@ main    NOP                             ; main program
         CLR R12                         ;
         CLR R13                         ; 
         
-        MOV.W arg1+2, R8                ; Wpisanie argumentĂłw do rejestrĂłw
+        MOV.W arg1+2, R8                ; Wpisanie argumentow do rejestrow
         MOV.W arg1, R7                  ; MSB arg1 do R8, LSB arg1 do R7
         MOV.W arg2+2, R10               ; MSB arg2 do R10
         MOV.W arg2, R9                  ; LSB arg2 do R9
@@ -91,11 +91,7 @@ to_pos2 INV R10				; Jesli nie analogicznie zamien na ujemna
         INV R9
         INC R9
         MOV #1, R12
-mltpl   ;CMP #0x0001, R8                 ; Sprawdzenie czy argumenty sa 16bitowe
-        ;JGE over                        ; Jesli arg1 wiekszy lub rowny 0xFFFF
-        ;CMP #0x0001, R10		; to skocz do over
-        ;JGE over			; Analogicznie z arg2
-        MOV R9, R4                      ; Wpisanie arg2 do R9
+mltpl   MOV R9, R4                      ; Wpisanie arg2 do R9
         MOV #1, R5                      ; Wpisanie 1 do R5 (licznik petli)
         CLR R10				; Wyczysc rejestry R10 i R8
         ;CLR R8
@@ -141,9 +137,7 @@ shift   RLA result                      ; Rotate left
         JNZ shift                       ; Skocz do shift jesli Z=0
         MOV.W R9, BCD_res		; Wpisanie R9 do BCD_res (LSW)
         MOV.W R8, BCD_res+2		; i R10 do BCD_res+2 (MSW)
-        ; Na podstawie MSP 430 Mixed Signal Microcontroller Application Reports
-        ; (page 559)
-        
+	
 range   
         CMP #9999, BCD_res+2
         JC over
@@ -191,7 +185,6 @@ r_buf   MOV.B   @R4+,R7               	; Odczyt bufora
         INC     R5                      ; Inkrementacja R5
         DEC     R6                      ; Dekrementacja R6 (licznik)
         JNZ     r_buf			; Jesli R6!=0 skocz do r_buf
-        ; Na podstawie LCD.s43 (prof Janusz Janiczek, kmeif.pwr.edu.pl)
 
 end_programme
         NOP
