@@ -11,7 +11,7 @@
                                               
         RSEG    DATA16_C                ; Constant R/only data segment (Flash).       
 
-LCD_table                               ; Tablica kodow LCD
+LCD_table                               ; LCD codes table
         DB 0xB7                         ; 0
         DB 0x12                         ; 1
         DB 0x8F                         ; 2
@@ -24,16 +24,16 @@ LCD_table                               ; Tablica kodow LCD
         DB 0x3F                         ; 9
         
 ;--- WPROWADZENIE ARGUMENTOW ----;        
-arg1    DL -90000                       ; Generates 32bit constant.
-arg2    DL 50                           ; Argumenty do wykonania operacji.
+arg1    DL -90000                       ; Generates 32bit constant
+arg2    DL 50                           ; Args for operations
 
-minus   DW 0x8000                       ; 1000 0000 0000 0000 w U2 liczba ujemna
-err     equ 0xAD                        ; kod LCD dla liczby E
+minus   DW 0x8000                       ; 1000 0000 0000 0000 negative number in U2
+err     equ 0xAD                        ; LCD code for E
 
         RSEG DATA16_Z                   ; Initialized to 0 data segment (RAM).
    
 result  DS32 1                          ; Allocates space for 32bit variable.
-BCD_res DS32 1                          ; wynik, wynik w BCD i bufor LCD
+BCD_res DS32 1                          ; result, result in BCD and LCD buffer
 LCD_buf DS8 7
 
         RSEG CODE                       ; place program in 'CODE' segment
@@ -44,147 +44,147 @@ main    NOP                             ; main program
         MOV.W #WDTPW+WDTHOLD,&WDTCTL    ; Stop watchdog timer
         MOV.B #0xFD, &LCDACTL           ; Sets up LCDA register, MUX4 mode
 
-        CLR R5                          ; Wyczyszczenie rejestrĂłw
-        CLR R6                          ; Adres bufora LCD
+        CLR R5                          ; Clearing registers
+        CLR R6                          ; LCD buffer
         CLR R7                          ; LSW arg1
         CLR R8                          ; MSW arg1
         CLR R9                          ; LSW arg2
         CLR R10                         ; MSW arg2
-        CLR R11                         ; Rejestry pomocnicze
+        CLR R11                         ; Auxilary registers
         CLR R12                         ;
         CLR R13                         ; 
         
-        MOV.W arg1+2, R8                ; Wpisanie argumentow do rejestrow
-        MOV.W arg1, R7                  ; MSB arg1 do R8, LSB arg1 do R7
-        MOV.W arg2+2, R10               ; MSB arg2 do R10
-        MOV.W arg2, R9                  ; LSB arg2 do R9
+        MOV.W arg1+2, R8                ; Writing arguments to registers
+        MOV.W arg1, R7                  ; MSB arg1 to R8, LSB arg1 to R7
+        MOV.W arg2+2, R10               ; MSB arg2 to R10
+        MOV.W arg2, R9                  ; LSB arg2 to R9
         
 ;--- WYBOR OPERACJI ---;        
         ;CALL #addition
         ;CALL #substraction
         CALL #multiplication
         
-addition                                ; dodawanie
+addition                                ; 
         ADD.W R9, R7                    ; LSB + LSB
-        ADDC.W R10, R8                  ; MSB + MSB z uzwglednieniem Carry
-        JN set_minus_flag               ; Skocz do etykiety set_minus_flag jesli N=1
-        JMP save_result                 ; Jak nie to skocz do save_result
+        ADDC.W R10, R8                  ; MSB + MSB including Carry
+        JN set_minus_flag               ; Go to set_minus_flag if N=1
+        JMP save_result                 ; Else if go to save_result
         
-substraction                            ; odejmowanie
+substraction                            ; 
         SUB.W R9, R7                    ; LSB - LSB
-        SUBC.W R10, R8                  ; MSB - MSB z uwzglednieniem Carry
-        JN set_minus_flag               ; Skocz do etykiety set_minus_flag jesli N=1
-        JMP save_result                 ; Jak nie to skocz do save_result
+        SUBC.W R10, R8                  ; MSB - MSB including Carry
+        JN set_minus_flag               ; Go to  do set_minus_flag if N=1
+        JMP save_result                 ; Else if go to save_result
         
 multiplication
-        BIT minus, R8                   ; Sprawdzenie czy arg1 < 0
-        JN to_pos1                      ; Testowanie najstarszego bitu (znak w u2)
-        JMP next                        ; Jesli arg1 dodatni sprawdz arg2
-to_pos1 INV R8                          ; Jesli ujemny zamien na dodatni
-        INV R7                          ; (odwroc bity i dodaj 1)
+        BIT minus, R8                   ; Check if arg1 < 0
+        JN to_pos1                      ; Test oldest bit (sign in u2)
+        JMP next                        ; If arg1 positive check arg2
+to_pos1 INV R8                          ; If negative convert to positive
+        INV R7                          ; (invert bits and add 1)
         INC R7
-        MOV #1, R11                     ; Analogiczne sprawdzenie arg2
+        MOV #1, R11                     ; Checking arg2
 next    BIT minus, R10                   
         JN to_pos2
-        JMP mltpl                       ; Jesli arg2 dodatni skocz do mltpl
-to_pos2 INV R10				; Jesli nie analogicznie zamien na ujemna
+        JMP mltpl                       ; If arg2 positive go to mltpl
+to_pos2 INV R10				; Else if convert to negative
         INV R9
         INC R9
         MOV #1, R12
-mltpl   MOV R9, R4                      ; Wpisanie arg2 do R9
-        MOV #1, R5                      ; Wpisanie 1 do R5 (licznik petli)
-        CLR R10				; Wyczysc rejestry R10 i R8
+mltpl   MOV R9, R4                      ; Write arg2 to R9
+        MOV #1, R5                      ; Write 1 to R5 (loop counter)
+        CLR R10				; Clear R10 i R8
         ;CLR R8
-        MOV.W R7, R9                    ; Wpisz arg1 do R9
+        MOV.W R7, R9                    ; Wrte arg1 to R9
         MOV.W R8, R10
-loop    INC R5                          ; Inkrementacja R5
+loop    INC R5                          ; Increment R5
         ADD.W R9, R7                    ; LSW + LSW
         ADDC.W R10, R8                  ; MSW + MSW with Carry
-        CMP R5,R4                       ; Porownanie R5 i R4. Jesli R4 = R5 to Z=1
-        JNZ loop                        ; Jesli Z=0 skocz do loop
-        CLRZ				; Jesli nie to wyczysc Z
-        CMP R12, R11                    ; Wynik dodatni jesli 
-        JEQ save_result                 ; Skocz do save result jesli R12=R11
-        MOV.B #0x10,LCDM8               ; Jesli nie, zasygnalizuj minus                      
-        MOV.W R7, result                ; Wpisz zawartosc rejestrow R7 i R8
-        MOV.W R8, result+2              ; do BCD_result
-        JMP BCD_conversion		; Skocz do BCD_conversion
+        CMP R5,R4                       ; Compare R5 i R4. If R4 = R5 to Z=1
+        JNZ loop                        ; If Z=0 go to loop
+        CLRZ				; Else if clear Z
+        CMP R12, R11                    ; If result positive
+        JEQ save_result                 ; Go to save result if R12=R11
+        MOV.B #0x10,LCDM8               ; Else if set negative flag                      
+        MOV.W R7, result                ; Write R7 i R8 register content
+        MOV.W R8, result+2              ; to BCD_result
+        JMP BCD_conversion		; Go to BCD_conversion
         
 set_minus_flag
-        MOV.B #0x10,LCDM8 		; Zasygnalizowanie ujemnego wyniku
+        MOV.B #0x10,LCDM8 		; Set negative result flag
         
 save_result
-        MOV.W R7, result                ; Zapisywanie wyniku do result
-        MOV.W R8, result+2		; (miejsce w pamieci)
-        BIT minus, result+2             ; Sprawdzenie czy wynik < 0
-        JN is_negative                  ; Jesli wynik < 0 (N=1) skocz do       
-	JMP BCD_conversion		; is_negative, jesli nie do BCD_conv
+        MOV.W R7, result                ; Enter result to result
+        MOV.W R8, result+2		; (memory address)
+        BIT minus, result+2             ; Check if result < 0
+        JN is_negative                  ; If result < 0 (N=1) go to    
+	JMP BCD_conversion		; is_negative, else if go to BCD_conv
 is_negative 
-        INV result+2                    ; Zamiana na liczbe dodatnia w U2 
-        INV result                      ; (odwrĂłc bity i dodaj 1)
+        INV result+2                    ; Convert to positiv number in U2 
+        INV result                      ; (invert bits and add 1)
         INC result
-        DADC result+2                   ; Dodaj Carry
+        DADC result+2                   ; Add Carry
 
 BCD_conversion
-        MOV #32, R5                     ; Wpisz 32 do rejestru R5 (licznik)
-        CLR R8				; Czyszczenie rejestrow	
+        MOV #32, R5                     ; Enter 32 to R5 register (counter)
+        CLR R8				; Clear registers
         CLR R9
 shift   RLA result                      ; Rotate left
         RLC result+2                    ; Rotate left with Carry
         DADD R9, R9                     ; src, dst + C to dst (decimally) LSW
         DADD R8, R8			; MSW
-        DEC R5                          ; Dekrementacja R15
-        JNZ shift                       ; Skocz do shift jesli Z=0
-        MOV.W R9, BCD_res		; Wpisanie R9 do BCD_res (LSW)
-        MOV.W R8, BCD_res+2		; i R10 do BCD_res+2 (MSW)
+        DEC R5                          ; Decrementation R15
+        JNZ shift                       ; Go to shift if Z=0
+        MOV.W R9, BCD_res		; Enter R9 to BCD_res (LSW)
+        MOV.W R8, BCD_res+2		; and R10 to BCD_res+2 (MSW)
 	
 range   
         CMP #9999, BCD_res+2
         JC over
         JMP write_buffer
-over    MOV.B #0xAD, LCDM1		; Zasygnalizowanie przekroczenia zakresu
-        JMP end_programme 		; Skocz do end_programme
+over    MOV.B #0xAD, LCDM1		; Set range overflow
+        JMP end_programme 		; Go to end_programme
 
 write_buffer
-        MOV #0x000F, R7                 ; Ustawienie maski
-        CLR R10                         ; Licznik petli dla maski                  
-        MOV #LCD_buf,R6                 ; Wpisz adres LCD_buff do R6
+        MOV #0x000F, R7                 ; Set mask
+        CLR R10                         ; Loop counter for mask                  
+        MOV #LCD_buf,R6                 ; Enter LCD_buff address to R6
 loop_a  CLR R11
-        CMP #4, R10			; Porownanie R10 z 4
-        JEQ display			; Jesli jest rowne to skocz do display
-        MOV BCD_res, R5                 ; Zapisz LSW BCD_res do R5
-        MOV BCD_res+2, R8		; Zapisz MSW BCD_res do R8
-        AND R7, R5			; maska AND LSW BCD_res
-        AND R7, R8			; i MSW 
-	CMP #0, R10			; Sprawdz czy R10=0
-	JNE loop_b			; Jesli nie skocz do loop_b
-	MOV.B R5,0(R6)			; Jesli tak zapisz zawartosc rejestru R5 
-        MOV.B R8,4(R6)			; do komorki pod adresem 0+R6 (LSW LCD_buf)
-	INC R6				; oraz R8 do 4+R6 (MSW LCD_buf)
-	INC R10				; Inkrementacja R6 i R10
-	RLAM.A #4,R7			; Przesun bitowo zawartoĹ›Ä‡ R7 w lewo 4x
-	JMP loop_a			; Skocz do loop_a
-loop_b  RRAM.A #4, R5			; Przesun bitowo zawartoĹ›Ä‡ R5 w prawo 4x
-        RRAM.A #4, R8			; i analogiczne R8
-        INC R11				; Inkrementacja R11
-	CMP R11, R10			; Porownaj R11 i R10
-	JNE loop_b			; Jesli nie sa rowne skocz do loop_b
-	MOV.B R5,0(R6)			; Zapisz do bufora kolejna liczbe
-        MOV.B R8,4(R6)			; w BCD na LSB LCD_buf i LCD_buf+2
-	INC R6				; Inkrementacja R6 i R10
+        CMP #4, R10			; Compare R10 and 4
+        JEQ display			; If equal go to display
+        MOV BCD_res, R5                 ; Save LSW BCD_res to R5
+        MOV BCD_res+2, R8		; Save MSW BCD_res to R8
+        AND R7, R5			; AND LSW BCD_res mask
+        AND R7, R8			; and MSW 
+	CMP #0, R10			; Check if R10=0
+	JNE loop_b			; If not go to loop_b
+	MOV.B R5,0(R6)			; Else if save content to R5 register
+        MOV.B R8,4(R6)			; to cell address 0+R6 (LSW LCD_buf)
+	INC R6				; and R8 to 4+R6 (MSW LCD_buf)
+	INC R10				; Incrementation R6 and R10
+	RLAM.A #4,R7			; Shift R7 content left 4x
+	JMP loop_a			; Go to loop_a
+loop_b  RRAM.A #4, R5			; Shift R5 content right 4x
+        RRAM.A #4, R8			; and R8
+        INC R11				; IncrementationR11
+	CMP R11, R10			; Compare R11 i R10
+	JNE loop_b			; If not equal go to loop_b
+	MOV.B R5,0(R6)			; Save next number to LCD buffer
+        MOV.B R8,4(R6)			; in BCD to LSB LCD_buf and LCD_buf+2
+	INC R6				; Incrementation R6 and R10
 	INC R10
-	RLAM.A #4,R7			; Przesun bitowo maske o 0xF w lewo
-	JMP loop_a                	; Skocz do loop_a
+	RLAM.A #4,R7			; Shift mask by 0xF left
+	JMP loop_a                	; Go to loop_a
                
 display
-        MOV     #LCD_buf,R4             ; Zapisz adres LCD_buf do R4
-        CLR     R5			; Wyczysc R5
-        MOV     #7,R6                   ; Wpisz 7 do R6 (licznik petli)
-r_buf   MOV.B   @R4+,R7               	; Odczyt bufora
-        MOV.B   LCD_table(R7),LCDMEM(R5); Wyslij kod do LCD
-        INC     R5                      ; Inkrementacja R5
-        DEC     R6                      ; Dekrementacja R6 (licznik)
-        JNZ     r_buf			; Jesli R6!=0 skocz do r_buf
+        MOV     #LCD_buf,R4             ; Save LCD_buf address to R4
+        CLR     R5			; Clear R5
+        MOV     #7,R6                   ; Enter 7 to R6 (loop counter)
+r_buf   MOV.B   @R4+,R7               	; Read buffer
+        MOV.B   LCD_table(R7),LCDMEM(R5); Send LCD code
+        INC     R5                      ; Incrementation R5
+        DEC     R6                      ; Decrementation R6 (counter)
+        JNZ     r_buf			; If R6!=0 go to r_buf
 
 end_programme
         NOP
